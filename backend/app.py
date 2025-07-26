@@ -10,12 +10,13 @@ from flask_cors import CORS
 import base64
 from PIL import Image
 import io
+import traceback
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
 # === CONFIGURATION ===
-model_dir = r'F:/Campus/4.2/Research/After Progress presentation/Models/SVM'
+model_dir = os.path.join(os.path.dirname(__file__), 'models')
 model_path = os.path.join(model_dir, 'svm_best_model.joblib')
 scaler_path = os.path.join(model_dir, 'scaler_best.joblib')
 encoder_path = os.path.join(model_dir, 'label_encoder_best.joblib')
@@ -104,11 +105,33 @@ def process_image(img_bgr):
     mean_sat = np.mean(hsv[:,:,1])
     mean_val = np.mean(hsv[:,:,2])
 
+    # === Shape features ===
+    # Threshold to get binary mask
+    _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if contours:
+        c = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(c)
+        perimeter = cv2.arcLength(c, True)
+        x, y, w, h = cv2.boundingRect(c)
+        extent = area / (w * h) if w * h > 0 else 0
+        hull = cv2.convexHull(c)
+        hull_area = cv2.contourArea(hull)
+        solidity = area / hull_area if hull_area > 0 else 0
+        if len(c) >= 5:
+            (x_, y_), (MA, ma), angle = cv2.fitEllipse(c)
+            eccentricity = np.sqrt(1 - (MA/ma)**2) if ma > 0 else 0
+        else:
+            eccentricity = 0
+    else:
+        area = perimeter = extent = solidity = eccentricity = 0
+
     features = [
         mean_r, mean_g, mean_b,
         std_r, std_g, std_b,
         mean_hue, mean_sat, mean_val,
-        contrast, correlation, energy, entropy, homogeneity
+        contrast, correlation, energy, entropy, homogeneity,
+        area, perimeter, eccentricity, solidity, extent
     ]
     
     return features, {
@@ -119,6 +142,13 @@ def process_image(img_bgr):
             'energy': float(energy),
             'homogeneity': float(homogeneity),
             'entropy': float(entropy)
+        },
+        'shapeFeatures': {
+            'area': float(area),
+            'perimeter': float(perimeter),
+            'eccentricity': float(eccentricity),
+            'solidity': float(solidity),
+            'extent': float(extent)
         }
     }
 
@@ -137,11 +167,15 @@ def predict_mushroom():
         
         # Process image and extract features
         features, feature_details = process_image(img_bgr)
+        print('Features:', features)
         
         # === Step 4: Predict and map to class name ===
         scaled = scaler.transform([features])
+        print('Scaled features:', scaled)
         pred_proba = model.predict_proba(scaled)[0]
+        print('Predicted probabilities:', pred_proba)
         pred_id = model.predict(scaled)[0]
+        print('Predicted label:', pred_id)
         pred_label = encoder.inverse_transform([pred_id])[0]
         
         # Get confidence as percentage
@@ -158,6 +192,8 @@ def predict_mushroom():
         })
         
     except Exception as e:
+        print('--- Exception in /predict endpoint ---')
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
