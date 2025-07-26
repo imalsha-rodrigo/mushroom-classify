@@ -11,6 +11,17 @@ type UserRole = "farmer" | "normal" | null;
 interface PredictionResult {
   mushroomType: string;
   confidence: number;
+  classId: number;
+  features?: {
+    colorMean: [number, number, number];
+    textureFeatures: {
+      contrast: number;
+      correlation: number;
+      energy: number;
+      homogeneity: number;
+      entropy: number;
+    };
+  };
   environmentalData?: {
     temperature: string;
     humidity: string;
@@ -54,29 +65,39 @@ export default function Identify() {
 
     setIsAnalyzing(true);
     
-    // Simulate ML prediction with mock data
+    // Enhanced mock prediction simulating your ML model
     setTimeout(() => {
+      // Simulate the label mapping from your Python script
+      const mushroomTypes = [
+        { id: 1, name: "Abalone Mushroom", confidence: 89.3 },
+        { id: 2, name: "Pink Oyster", confidence: 94.7 },
+        { id: 3, name: "Bhutan Oyster", confidence: 87.2 },
+        { id: 4, name: "American Oyster", confidence: 92.1 },
+        { id: 5, name: "Button Mushroom", confidence: 96.8 },
+        { id: 6, name: "Unknown Type", confidence: 45.2 }
+      ];
+      
+      // Randomly select a mushroom type (in real implementation, this would be your ML prediction)
+      const randomType = mushroomTypes[Math.floor(Math.random() * mushroomTypes.length)];
+      
       const mockResult: PredictionResult = {
-        mushroomType: "Shiitake Mushroom",
-        confidence: 94.2,
+        mushroomType: randomType.name,
+        confidence: randomType.confidence,
+        classId: randomType.id,
+        features: {
+          colorMean: [145.2, 123.8, 98.5], // Mock RGB means
+          textureFeatures: {
+            contrast: 0.234,
+            correlation: 0.876,
+            energy: 0.145,
+            homogeneity: 0.678,
+            entropy: 4.321
+          }
+        },
         ...(selectedRole === "farmer" ? {
-          environmentalData: {
-            temperature: "20-25°C (68-77°F)",
-            humidity: "75-85%",
-            light: "Indirect sunlight or shade",
-            substrate: "Hardwood logs (oak, beech, maple)"
-          }
+          environmentalData: getEnvironmentalData(randomType.id)
         } : {
-          nutritionalData: {
-            vitamins: ["Vitamin D", "Vitamin B6", "Vitamin B12", "Folate"],
-            minerals: ["Selenium", "Copper", "Zinc", "Potassium"],
-            benefits: [
-              "Boosts immune system",
-              "Supports heart health", 
-              "Rich in antioxidants",
-              "May help lower cholesterol"
-            ]
-          }
+          nutritionalData: getNutritionalData(randomType.id)
         })
       };
       
@@ -88,6 +109,39 @@ export default function Identify() {
         description: `Identified as ${mockResult.mushroomType} with ${mockResult.confidence}% confidence.`,
       });
     }, 2000);
+  };
+
+  const getEnvironmentalData = (classId: number) => {
+    const envData: Record<number, any> = {
+      1: { temperature: "18-22°C", humidity: "85-90%", light: "Indirect sunlight", substrate: "Hardwood sawdust" },
+      2: { temperature: "20-25°C", humidity: "80-85%", light: "Low light", substrate: "Straw, cotton hulls" },
+      3: { temperature: "15-20°C", humidity: "75-85%", light: "Shade", substrate: "Oak, beech logs" },
+      4: { temperature: "22-28°C", humidity: "80-90%", light: "Filtered light", substrate: "Hardwood logs" },
+      5: { temperature: "20-25°C", humidity: "75-85%", light: "Dark environment", substrate: "Composted manure" },
+      6: { temperature: "Variable", humidity: "Variable", light: "Unknown", substrate: "Unknown" }
+    };
+    return envData[classId] || envData[6];
+  };
+
+  const getNutritionalData = (classId: number) => {
+    const nutritionData: Record<number, any> = {
+      1: {
+        vitamins: ["Vitamin D", "Vitamin B3", "Folate"],
+        minerals: ["Potassium", "Selenium", "Copper"],
+        benefits: ["Supports immune system", "Rich in antioxidants", "Low calorie protein source"]
+      },
+      2: {
+        vitamins: ["Vitamin B6", "Vitamin C", "Riboflavin"],
+        minerals: ["Iron", "Zinc", "Phosphorus"],
+        benefits: ["Anti-inflammatory properties", "Supports heart health", "Good source of fiber"]
+      },
+      5: {
+        vitamins: ["Vitamin D", "Vitamin B12", "Niacin"],
+        minerals: ["Selenium", "Potassium", "Copper"],
+        benefits: ["Boosts immune function", "Supports bone health", "Low in calories"]
+      }
+    };
+    return nutritionData[classId] || nutritionData[5];
   };
 
   return (
@@ -192,8 +246,14 @@ export default function Identify() {
                 <div className="text-center p-4 bg-accent/10 rounded-lg">
                   <h3 className="text-xl font-bold text-foreground">{prediction.mushroomType}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Confidence: {prediction.confidence}%
+                    Confidence: {prediction.confidence}% | Class ID: {prediction.classId}
                   </p>
+                  {prediction.features && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <p>RGB: ({prediction.features.colorMean.map(v => v.toFixed(1)).join(', ')})</p>
+                      <p>Texture Entropy: {prediction.features.textureFeatures.entropy.toFixed(3)}</p>
+                    </div>
+                  )}
                 </div>
 
                 {prediction.environmentalData && (
