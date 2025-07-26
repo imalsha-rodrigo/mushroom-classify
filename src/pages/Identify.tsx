@@ -65,50 +65,53 @@ export default function Identify() {
 
     setIsAnalyzing(true);
     
-    // Enhanced mock prediction simulating your ML model
-    setTimeout(() => {
-      // Simulate the label mapping from your Python script
-      const mushroomTypes = [
-        { id: 1, name: "Abalone Mushroom", confidence: 89.3 },
-        { id: 2, name: "Pink Oyster", confidence: 94.7 },
-        { id: 3, name: "Bhutan Oyster", confidence: 87.2 },
-        { id: 4, name: "American Oyster", confidence: 92.1 },
-        { id: 5, name: "Button Mushroom", confidence: 96.8 },
-        { id: 6, name: "Unknown Type", confidence: 45.2 }
-      ];
-      
-      // Randomly select a mushroom type (in real implementation, this would be your ML prediction)
-      const randomType = mushroomTypes[Math.floor(Math.random() * mushroomTypes.length)];
-      
-      const mockResult: PredictionResult = {
-        mushroomType: randomType.name,
-        confidence: randomType.confidence,
-        classId: randomType.id,
-        features: {
-          colorMean: [145.2, 123.8, 98.5], // Mock RGB means
-          textureFeatures: {
-            contrast: 0.234,
-            correlation: 0.876,
-            energy: 0.145,
-            homogeneity: 0.678,
-            entropy: 4.321
-          }
+    try {
+      // Call your ML backend API
+      const response = await fetch('http://localhost:5000/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          image: uploadedImage
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze image');
+      }
+
+      const result = await response.json();
+      
+      const predictionResult: PredictionResult = {
+        mushroomType: result.mushroomType,
+        confidence: result.confidence,
+        classId: result.classId,
+        features: result.features,
         ...(selectedRole === "farmer" ? {
-          environmentalData: getEnvironmentalData(randomType.id)
+          environmentalData: getEnvironmentalData(result.classId)
         } : {
-          nutritionalData: getNutritionalData(randomType.id)
+          nutritionalData: getNutritionalData(result.classId)
         })
       };
       
-      setPrediction(mockResult);
-      setIsAnalyzing(false);
+      setPrediction(predictionResult);
       
       toast({
         title: "Analysis Complete!",
-        description: `Identified as ${mockResult.mushroomType} with ${mockResult.confidence}% confidence.`,
+        description: `Identified as ${predictionResult.mushroomType} with ${predictionResult.confidence}% confidence.`,
       });
-    }, 2000);
+      
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "Could not analyze the image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const getEnvironmentalData = (classId: number) => {
