@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,10 @@ import { useToast } from "@/hooks/use-toast";
 type UserRole = "farmer" | "normal" | null;
 
 interface PredictionResult {
-  mushroomType: string;
+  mushroomType: {
+    common: string;
+    scientific: string;
+  };
   confidence: number;
   classId: number;
   features?: {
@@ -41,6 +44,7 @@ export default function Identify() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -51,6 +55,10 @@ export default function Identify() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   const analyzeMushroom = async () => {
@@ -67,7 +75,7 @@ export default function Identify() {
     
     try {
       // Call your ML backend API
-      const response = await fetch('http://localhost:5000/predict', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/predict`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +107,7 @@ export default function Identify() {
       
       toast({
         title: "Analysis Complete!",
-        description: `Identified as ${predictionResult.mushroomType} with ${predictionResult.confidence}% confidence.`,
+        description: `Identified as ${predictionResult.mushroomType.common} with ${predictionResult.confidence}% confidence.`,
       });
       
     } catch (error) {
@@ -137,6 +145,11 @@ export default function Identify() {
         vitamins: ["Vitamin B6", "Vitamin C", "Riboflavin"],
         minerals: ["Iron", "Zinc", "Phosphorus"],
         benefits: ["Anti-inflammatory properties", "Supports heart health", "Good source of fiber"]
+      },
+      4: {
+        vitamins: ["Vitamin D", "Vitamin B2", "Niacin"],
+        minerals: ["Iron", "Zinc", "Phosphorus"],
+        benefits: ["Supports heart health", "Good source of protein", "Low in calories"]
       },
       5: {
         vitamins: ["Vitamin D", "Vitamin B12", "Niacin"],
@@ -186,6 +199,14 @@ export default function Identify() {
               <div>
                 <label className="block text-sm font-medium mb-2">Upload Mushroom Image</label>
                 <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    ref={fileInputRef}
+                  />
+                  
                   {uploadedImage ? (
                     <div className="space-y-4">
                       <img 
@@ -193,34 +214,24 @@ export default function Identify() {
                         alt="Uploaded mushroom" 
                         className="max-h-64 mx-auto rounded-lg shadow-soft"
                       />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        id="image-upload"
-                      />
-                      <label htmlFor="image-upload">
-                        <Button variant="outline" className="cursor-pointer">
-                          Change Image
-                        </Button>
-                      </label>
+                      <Button 
+                        type="button" 
+                        onClick={triggerFileInput}
+                        variant="outline"
+                      >
+                        Change Image
+                      </Button>
                     </div>
                   ) : (
                     <div>
                       <Leaf className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        id="image-upload"
-                      />
-                      <label htmlFor="image-upload">
-                        <Button variant="outline" className="cursor-pointer">
-                          Choose Image
-                        </Button>
-                      </label>
+                      <Button 
+                        type="button" 
+                        onClick={triggerFileInput}
+                        variant="outline"
+                      >
+                        Choose Image
+                      </Button>
                       <p className="text-sm text-muted-foreground mt-2">
                         PNG, JPG up to 10MB
                       </p>
@@ -247,7 +258,8 @@ export default function Identify() {
             {prediction ? (
               <div className="space-y-6">
                 <div className="text-center p-4 bg-accent/10 rounded-lg">
-                  <h3 className="text-xl font-bold text-foreground">{prediction.mushroomType}</h3>
+                  <h3 className="text-xl font-bold text-foreground">{prediction.mushroomType.common}</h3>
+                  <p className="text-sm text-muted-foreground italic mb-2">{prediction.mushroomType.scientific}</p>
                   <p className="text-sm text-muted-foreground">
                     Confidence: {prediction.confidence}% | Class ID: {prediction.classId}
                   </p>
