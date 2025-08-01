@@ -9,7 +9,10 @@ import { useToast } from "@/hooks/use-toast";
 type UserRole = "farmer" | "normal" | null;
 
 interface PredictionResult {
-  mushroomType: string;
+  mushroomType: {
+    common: string;
+    scientific: string;
+  };
   confidence: number;
   classId: number;
   features?: {
@@ -104,7 +107,7 @@ export default function Identify() {
       
       toast({
         title: "Analysis Complete!",
-        description: `Identified as ${predictionResult.mushroomType} with ${predictionResult.confidence}% confidence.`,
+        description: `Identified as ${predictionResult.mushroomType.common} with ${predictionResult.confidence}% confidence.`,
       });
       
     } catch (error) {
@@ -255,7 +258,8 @@ export default function Identify() {
             {prediction ? (
               <div className="space-y-6">
                 <div className="text-center p-4 bg-accent/10 rounded-lg">
-                  <h3 className="text-xl font-bold text-foreground">{prediction.mushroomType}</h3>
+                  <h3 className="text-xl font-bold text-foreground">{prediction.mushroomType.common}</h3>
+                  <p className="text-sm text-muted-foreground italic mb-2">{prediction.mushroomType.scientific}</p>
                   <p className="text-sm text-muted-foreground">
                     Confidence: {prediction.confidence}% | Class ID: {prediction.classId}
                   </p>

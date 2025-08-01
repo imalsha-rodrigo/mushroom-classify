@@ -1,44 +1,149 @@
+import { useState, useRef } from "react";
 import { Navigation } from "@/components/Navigation";
+import { Footer } from "@/components/Footer";
 import { MushroomCard } from "@/components/MushroomCard";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { Camera, Leaf, Users, Sparkles } from "lucide-react";
+import { Camera, Leaf, Users, Sparkles, Upload, Thermometer, Droplets, Sun } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import heroImage from "@/assets/hero-mushrooms.jpg";
 import shiitakeImage from "@/assets/shiitake.jpg";
 import oysterImage from "@/assets/oyster.jpg";
 import buttonImage from "@/assets/button.jpg";
 import portobelloImage from "@/assets/portobello.jpg";
 
-const mushroomTypes = [
-  {
-    name: "Shiitake",
-    scientificName: "Lentinula edodes",
-    image: shiitakeImage,
-    description: "Popular medicinal mushroom known for immune-boosting properties and rich umami flavor."
-  },
-  {
-    name: "Oyster Mushroom",
-    scientificName: "Pleurotus ostreatus",
-    image: oysterImage,
-    description: "Versatile and easy-to-grow mushrooms with a delicate texture and mild flavor."
-  },
-  {
-    name: "Button Mushroom",
-    scientificName: "Agaricus bisporus",
-    image: buttonImage,
-    description: "The most common cultivated mushroom, perfect for beginners and everyday cooking."
-  },
-  {
-    name: "Portobello",
-    scientificName: "Agaricus bisporus (mature)",
-    image: portobelloImage,
-    description: "Mature button mushrooms with a meaty texture, perfect as a meat substitute."
-  }
-];
+interface PredictionResult {
+  mushroomType: {
+    common: string;
+    scientific: string;
+  };
+  confidence: number;
+  classId: number;
+  features?: {
+    colorMean: [number, number, number];
+    textureFeatures: {
+      contrast: number;
+      correlation: number;
+      energy: number;
+      homogeneity: number;
+      entropy: number;
+    };
+  };
+  growingParameters?: {
+    spawnRun: { temperature: string; humidity: string; co2: string; light: string };
+    primordiaFormation: { temperature: string; humidity: string; co2: string; light: string };
+    fruitingBodyFormation: { temperature: string; humidity: string; co2: string; light: string };
+  };
+}
 
 const Index = () => {
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadedImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  const analyzeMushroom = async () => {
+    if (!uploadedImage) {
+      toast({
+        title: "Missing Information",
+        description: "Please upload an image first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    
+    try {
+      // Call your ML backend API
+      const response = await fetch('http://localhost:5000/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: uploadedImage
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze image');
+      }
+
+      const result = await response.json();
+      
+      const predictionResult: PredictionResult = {
+        mushroomType: result.mushroomType,
+        confidence: result.confidence,
+        classId: result.classId,
+        features: result.features,
+        growingParameters: getGrowingParameters(result.classId)
+      };
+      
+      setPrediction(predictionResult);
+      
+      toast({
+        title: "Analysis Complete!",
+        description: `Identified as ${predictionResult.mushroomType.common} with ${predictionResult.confidence}% confidence.`,
+      });
+      
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "Could not analyze the image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getGrowingParameters = (classId: number) => {
+    const params: Record<number, any> = {
+      0: { // Abalone
+        spawnRun: { temperature: "24-30°C", humidity: "90-95%", co2: "5,000-20,000 ppm", light: "Total dark" },
+        primordiaFormation: { temperature: "18-24°C", humidity: "95-100%", co2: "500-1,000 ppm", light: "500-1,000 lux" },
+        fruitingBodyFormation: { temperature: "21-27°C", humidity: "85-90%", co2: "<2,000 ppm", light: "500-1,000 lux" }
+      },
+      1: { // Pink Oyster
+        spawnRun: { temperature: "24-27°C", humidity: "90-100%", co2: "20,000 ppm", light: "Total dark" },
+        primordiaFormation: { temperature: "17-19°C", humidity: "95%", co2: "600 ppm", light: "2,000 lux" },
+        fruitingBodyFormation: { temperature: "19-20°C", humidity: "85-92%", co2: "600 ppm", light: "2,000 lux" }
+      },
+      2: { // Bhutan Oyster
+        spawnRun: { temperature: "24-27°C", humidity: "90-100%", co2: "20,000 ppm", light: "Total dark" },
+        primordiaFormation: { temperature: "17-19°C", humidity: "95%", co2: "600 ppm", light: "2,000 lux" },
+        fruitingBodyFormation: { temperature: "19-20°C", humidity: "85-92%", co2: "600 ppm", light: "2,000 lux" }
+      },
+      3: { // American Oyster
+        spawnRun: { temperature: "24-27°C", humidity: "90-100%", co2: "20,000 ppm", light: "Total dark" },
+        primordiaFormation: { temperature: "17-19°C", humidity: "95%", co2: "600 ppm", light: "2,000 lux" },
+        fruitingBodyFormation: { temperature: "19-20°C", humidity: "85-92%", co2: "600 ppm", light: "2,000 lux" }
+      }
+    };
+    return params[classId] || params[0];
+  };
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background dark:bg-slate-950">
       <Navigation />
       
       {/* Hero Section */}
@@ -49,7 +154,7 @@ const Index = () => {
             alt="Various mushrooms" 
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-primary opacity-80"></div>
+          <div className="absolute inset-0 bg-gradient-primary opacity-80 dark:opacity-90"></div>
         </div>
         
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
@@ -61,103 +166,162 @@ const Index = () => {
               Your intelligent guide to mushroom identification and cultivation. 
               Get tailored recommendations whether you're a farmer or enthusiast.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/identify">
-                <Button size="lg" variant="golden" className="px-8 py-3">
-                  <Camera className="mr-2 h-5 w-5" />
-                  Identify Mushroom
-                </Button>
-              </Link>
-              <Button size="lg" variant="outline" className="px-8 py-3 bg-white/10 text-white border-white/30 hover:bg-white/20">
-                <Leaf className="mr-2 h-5 w-5" />
-                Learn About Types
-              </Button>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 bg-muted/30">
+      {/* Mushroom Identification Section */}
+      <section id="mushroom-identification" className="py-16 bg-slate-50 dark:bg-slate-900">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-foreground mb-4">
-              Tailored for Your Needs
+              Mushroom Identification
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Get personalized insights based on your role and interests
+              Upload a photo of your mushroom and get detailed growing parameters for optimal cultivation
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="text-center p-8 bg-card rounded-xl shadow-soft">
-              <div className="w-16 h-16 bg-gradient-forest rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">For Farmers</h3>
-              <p className="text-muted-foreground">
-                Get detailed environmental recommendations including temperature, humidity, 
-                light conditions, and substrate requirements for optimal mushroom cultivation.
-              </p>
-            </div>
-            
-            <div className="text-center p-8 bg-card rounded-xl shadow-soft">
-              <div className="w-16 h-16 bg-gradient-golden rounded-full flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">For Enthusiasts</h3>
-              <p className="text-muted-foreground">
-                Discover nutritional benefits, vitamins, minerals, and health advantages 
-                of different mushroom varieties for informed consumption choices.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+          <div className="grid gap-8 lg:grid-cols-2">
+            {/* Upload Section */}
+            <Card className="p-6 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <h3 className="text-2xl font-semibold mb-4 flex items-center text-foreground">
+                <Upload className="mr-2 h-6 w-6 text-primary" />
+                Upload & Analyze
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">Upload Mushroom Image</label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors dark:border-slate-600 dark:hover:border-primary/50">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      ref={fileInputRef}
+                    />
+                    
+                    {uploadedImage ? (
+                      <div className="space-y-4">
+                        <img 
+                          src={uploadedImage} 
+                          alt="Uploaded mushroom" 
+                          className="max-h-64 mx-auto rounded-lg shadow-soft"
+                        />
+                        <Button 
+                          type="button" 
+                          onClick={triggerFileInput}
+                          variant="outline"
+                        >
+                          Change Image
+                        </Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <Leaf className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <Button 
+                          type="button" 
+                          onClick={triggerFileInput}
+                          variant="outline"
+                        >
+                          Choose Image
+                        </Button>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          PNG, JPG up to 10MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-      {/* Mushroom Types Section */}
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Common Mushroom Varieties
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Explore different mushroom types and their unique characteristics
-            </p>
-          </div>
-          
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {mushroomTypes.map((mushroom, index) => (
-              <MushroomCard
-                key={index}
-                name={mushroom.name}
-                scientificName={mushroom.scientificName}
-                image={mushroom.image}
-                description={mushroom.description}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
+                <Button 
+                  onClick={analyzeMushroom}
+                  disabled={!uploadedImage || isAnalyzing}
+                  className="w-full"
+                  variant="golden"
+                >
+                  {isAnalyzing ? "Analyzing..." : "Identify Mushroom"}
+                </Button>
+              </div>
+            </Card>
 
-      {/* CTA Section */}
-      <section className="py-16 bg-gradient-earth">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-primary-foreground mb-4">
-            Ready to Identify Your Mushroom?
-          </h2>
-          <p className="text-lg text-primary-foreground/90 mb-8">
-            Upload a photo and get instant identification with personalized recommendations
-          </p>
-          <Link to="/identify">
-            <Button size="lg" variant="golden" className="px-8 py-3">
-              <Camera className="mr-2 h-5 w-5" />
-              Start Identification
-            </Button>
-          </Link>
+            {/* Results Section */}
+            <Card className="p-6 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <h3 className="text-2xl font-semibold mb-4 text-foreground">Results</h3>
+              
+              {prediction ? (
+                <div className="space-y-6">
+                  <div className="text-center p-4 bg-accent/10 rounded-lg dark:bg-slate-700/50">
+                    <h4 className="text-xl font-bold text-foreground">{prediction.mushroomType.common}</h4>
+                    <p className="text-sm text-muted-foreground italic mb-2">{prediction.mushroomType.scientific}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Confidence: {prediction.confidence}% | Class ID: {prediction.classId}
+                    </p>
+                    {prediction.features && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <p>RGB: ({prediction.features.colorMean.map(v => v.toFixed(1)).join(', ')})</p>
+                        <p>Texture Entropy: {prediction.features.textureFeatures.entropy.toFixed(3)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {prediction.growingParameters && (
+                    <div>
+                      <h5 className="font-semibold text-lg mb-3 flex items-center text-secondary">
+                        <Leaf className="mr-2 h-5 w-5" />
+                        Growing Parameters
+                      </h5>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="bg-accent/10 dark:bg-slate-700/50">
+                              <th className="border border-border p-2 text-left dark:border-slate-600">Growth Stage</th>
+                              <th className="border border-border p-2 text-left dark:border-slate-600">Temp (°C)</th>
+                              <th className="border border-border p-2 text-left dark:border-slate-600">RH (%)</th>
+                              <th className="border border-border p-2 text-left dark:border-slate-600">CO2 (ppm)</th>
+                              <th className="border border-border p-2 text-left dark:border-slate-600">Light (lux)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="border border-border p-2 font-medium dark:border-slate-600">Spawn Run</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.spawnRun.temperature}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.spawnRun.humidity}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.spawnRun.co2}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.spawnRun.light}</td>
+                            </tr>
+                            <tr className="bg-accent/5 dark:bg-slate-700/30">
+                              <td className="border border-border p-2 font-medium dark:border-slate-600">Primordia Formation</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.primordiaFormation.temperature}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.primordiaFormation.humidity}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.primordiaFormation.co2}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.primordiaFormation.light}</td>
+                            </tr>
+                            <tr>
+                              <td className="border border-border p-2 font-medium dark:border-slate-600">Fruiting Body Formation</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.fruitingBodyFormation.temperature}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.fruitingBodyFormation.humidity}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.fruitingBodyFormation.co2}</td>
+                              <td className="border border-border p-2 dark:border-slate-600">{prediction.growingParameters.fruitingBodyFormation.light}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Leaf className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                  <p>Upload an image to get started</p>
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 };
