@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs", "python39", "opencv", "gcc"]
+
+[phases.install]
+cmds = [
+    "npm install",
+    "npm run build",
+    "cp -r dist backend/",
+    "cd backend && pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = ["echo 'Build complete'"]
+
+[start]
+cmd = "cd backend && python app.py" 

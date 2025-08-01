@@ -75,7 +75,7 @@ export default function Identify() {
     
     try {
       // Call your ML backend API
-      const response = await fetch('http://localhost:5000/predict', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/predict`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

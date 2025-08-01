@@ -4,7 +4,7 @@ import numpy as np
 import joblib
 from ultralytics import YOLO
 from skimage.feature import graycomatrix, graycoprops
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import base64
 from PIL import Image
@@ -173,6 +173,15 @@ def predict_mushroom():
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'OK', 'message': 'Mushroom ML API is running'})
+
+# Serve React frontend
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    if path != "" and os.path.exists(os.path.join('dist', path)):
+        return send_from_directory('dist', path)
+    else:
+        return send_from_directory('dist', 'index.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
