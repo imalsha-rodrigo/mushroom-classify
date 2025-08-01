@@ -145,10 +145,19 @@ def predict_mushroom():
         
         # Ensure pred_id is an integer and handle edge cases
         pred_id = int(pred_id)
-        mapped_label = label_map.get(pred_id, {"common": "Unknown type", "scientific": "Unknown"})
+        mapped_label = label_map.get(pred_id, {"common": "Unknown Mushroom Type", "scientific": "Unknown species"})
         
         pred_proba = model.predict_proba(scaled)[0]
         confidence = float(np.max(pred_proba) * 100)
+        
+        # Check if confidence is too low or if there's no clear winner
+        sorted_proba = sorted(pred_proba, reverse=True)
+        confidence_diff = sorted_proba[0] - sorted_proba[1] if len(sorted_proba) > 1 else 0
+        
+        # If confidence is too low OR if the top two predictions are too close
+        if confidence < 50.0 or confidence_diff < 0.2:  # Adjustable thresholds
+            mapped_label = {"common": "Unknown Mushroom Type", "scientific": "Unknown species"}
+            confidence = 0.0
 
         return jsonify({
             'mushroomType': mapped_label,
