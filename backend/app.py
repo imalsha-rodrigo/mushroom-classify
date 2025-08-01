@@ -142,14 +142,18 @@ def predict_mushroom():
         scaled = scaler.transform([features])
         pred_id = model.predict(scaled)[0]
         pred_label = encoder.inverse_transform([pred_id])[0]
+        
+        # Ensure pred_id is an integer and handle edge cases
+        pred_id = int(pred_id)
         mapped_label = label_map.get(pred_id, {"common": "Unknown type", "scientific": "Unknown"})
+        
         pred_proba = model.predict_proba(scaled)[0]
         confidence = float(np.max(pred_proba) * 100)
 
         return jsonify({
             'mushroomType': mapped_label,
             'confidence': round(confidence, 1),
-            'classId': int(pred_id),
+            'classId': pred_id,
             'features': feature_details
         })
     except Exception as e:
